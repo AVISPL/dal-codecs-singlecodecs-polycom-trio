@@ -1,2 +1,2 @@
 # dal-codecs-singlecodecs-polycom-trio
-DAL adapter to monitor and control Polycom Trio device
+DAL adapter for Polycom Trio devices
