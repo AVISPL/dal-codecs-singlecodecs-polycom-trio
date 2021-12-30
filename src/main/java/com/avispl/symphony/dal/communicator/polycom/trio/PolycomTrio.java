@@ -3,58 +3,55 @@
  */
 package com.avispl.symphony.dal.communicator.polycom.trio;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 import com.avispl.symphony.api.common.error.NotImplementedException;
+import com.avispl.symphony.dal.util.StringUtils;
+import org.springframework.core.ParameterizedTypeReference;
+
 import com.avispl.symphony.api.dal.Version;
-import com.avispl.symphony.api.dal.control.Controller;
+import com.avispl.symphony.dal.communicator.RestCommunicator;
 import com.avispl.symphony.api.dal.control.call.CallController;
-import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
-import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.control.Protocol;
 import com.avispl.symphony.api.dal.dto.control.call.CallStatus;
 import com.avispl.symphony.api.dal.dto.control.call.CallStatus.CallStatusState;
 import com.avispl.symphony.api.dal.dto.control.call.DialDevice;
 import com.avispl.symphony.api.dal.dto.control.call.MuteStatus;
 import com.avispl.symphony.api.dal.dto.control.call.PopupMessage;
-import com.avispl.symphony.api.dal.dto.monitor.*;
+import com.avispl.symphony.api.dal.dto.monitor.AudioChannelStats;
+import com.avispl.symphony.api.dal.dto.monitor.CallStats;
+import com.avispl.symphony.api.dal.dto.monitor.EndpointStatistics;
+import com.avispl.symphony.api.dal.dto.monitor.RegistrationStatus;
+import com.avispl.symphony.api.dal.dto.monitor.Statistics;
+import com.avispl.symphony.api.dal.dto.monitor.VideoChannelStats;
 import com.avispl.symphony.api.dal.error.CommandFailureException;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
-import com.avispl.symphony.dal.aggregator.parser.AggregatedDeviceProcessor;
-import com.avispl.symphony.dal.aggregator.parser.PropertiesMapping;
-import com.avispl.symphony.dal.aggregator.parser.PropertiesMappingParser;
-import com.avispl.symphony.dal.communicator.RestCommunicator;
 import com.avispl.symphony.dal.util.StatisticsUtils;
-import com.avispl.symphony.dal.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.util.CollectionUtils;
 
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import static java.util.Collections.*;
 import static java.util.Collections.singletonList;
-import static java.util.Collections.singletonMap;
 
 /**
  * This class handles all communications to and from a Polycom Trio device.
- * 
+ *
  * @author Igor Shpyrko / Symphony Dev Team<br>
  *         Created on Sep 10, 2018
  * @since 4.5
  */
-public class PolycomTrio extends RestCommunicator implements CallController, Monitorable, Controller {
+public class PolycomTrio extends RestCommunicator implements CallController, Monitorable {
 
 	/**
 	 * Wraps message exchanged in REST API call to Polycom Trio device. <br>
 	 * This message contains list of data where each element in the list is a map (where key is a string and value can be string, list, or another map), and,
 	 * optional status (only available in response messages).
-	 * 
+	 *
 	 * @since 4.5
 	 */
 	public static class ListMessage {
@@ -71,7 +68,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 
 		/**
 		 * ListMessage constructor.
-		 * 
+		 *
 		 * @param data data to be sent
 		 */
 		public ListMessage(List<Map<String, ?>> data) {
@@ -121,9 +118,9 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 * Wraps message exchanged in REST API call to Polycom Trio device. <br>
 	 * This message contains single map of data (where key is a string and value can be string, list, or another map), and, optional status (only available in
 	 * response messages).
-	 * 
+	 *
 	 * @param <T> type of data wrapped in this message
-	 * 
+	 *
 	 * @since 4.5
 	 */
 	public static class Message<T> {
@@ -142,7 +139,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 
 		/**
 		 * Message constructor.
-		 * 
+		 *
 		 * @param data data to be sent
 		 */
 		public Message(Map<String, T> data) {
@@ -193,7 +190,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 * Note that name of the property is not wrapped along with value, typically properties are added to a map where key is a property name and value is the
 	 * object represented by this class. <br>
 	 * Note also that for config properties exposed in Polycom Trio UI, property names are available in the "Field Help" section.
-	 * 
+	 *
 	 * @since 4.7
 	 */
 	static class ConfigPropertyWrapper {
@@ -264,14 +261,6 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	private static final String MUTE_URI = "api/v1/callctrl/mute";
 	private static final String SESSION_STATS_URI = "api/v1/mgmt/media/sessionStats";
 
-	private static final String DEVICE_INFO_URI = "api/v1/mgmt/device/info";
-	private static final String NETWORK_STATS_URI = "api/v1/mgmt/network/stats";
-	private static final String RUNNING_CONFIG_URI = "api/v1/mgmt/device/runningConfig";
-	private static final String STATUS_URI = "api/v1/mgmt/pollForStatus";
-	private static final String RESTART_URI = "api/v1/mgmt/safeRestart";
-	private static final String REBOOT_URI = "api/v1/mgmt/safeReboot";
-	private static final String TRANSFER_TYPE_URI = "api/v1/mgmt/transferType/get";
-
 	// API parameters
 	private static final String FIRMWARE_RELEASE = "FirmwareRelease";
 	private static final String CATEGORY = "Category";
@@ -327,40 +316,6 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	private static final int MAX_STATUS_POLL_ATTEMPT = 5;
 
 	/**
-	 * Adapter metadata, collected from the version.properties
-	 */
-	private Properties adapterProperties;
-
-	private AggregatedDeviceProcessor devicePropertyProcessor;
-
-
-	@Override
-	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
-		String property = controllableProperty.getProperty();
-
-		switch (property) {
-			case "RestartDevice":
-				restartDevice();
-				break;
-			case "RebootDevice":
-				rebootDevice();
-				break;
-			default:
-				break;
-		}
-	}
-
-	@Override
-	public void controlProperties(List<ControllableProperty> list) throws Exception {
-		if (CollectionUtils.isEmpty(list)) {
-			throw new IllegalArgumentException("Controllable properties cannot be null or empty");
-		}
-		for (ControllableProperty controllableProperty : list) {
-			controlProperty(controllableProperty);
-		}
-	}
-
-	/**
 	 * Strips out prefix from the codec string.
 	 *
 	 * @param protocol codec string to normalize
@@ -383,13 +338,8 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	/**
 	 * PolycomTrio constructor
 	 */
-	public PolycomTrio() throws IOException {
+	public PolycomTrio() {
 		super();
-
-		Map<String, PropertiesMapping> mapping = new PropertiesMappingParser().loadYML("mapping/model-mapping.yml", getClass());
-		devicePropertyProcessor = new AggregatedDeviceProcessor(mapping);
-		adapterProperties = new Properties();
-		adapterProperties.load(getClass().getResourceAsStream("/version.properties"));
 
 		// typically devices do not have trusted certificates, instruct to trust all
 		setTrustAllCertificates(true);
@@ -402,32 +352,32 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 */
 	@Override
 	public String dial(DialDevice device) throws Exception {
-		/* 
+		/*
 		Description:
-		This API enables a user to initiate a call to a given number. Moreover, this API initiates the call and returns a response as an acknowledgment of request received.  
-		
-		Method: POST 
-		Path: /api/v1/callctrl/dial 
+		This API enables a user to initiate a call to a given number. Moreover, this API initiates the call and returns a response as an acknowledgment of request received.
+
+		Method: POST
+		Path: /api/v1/callctrl/dial
 		Input JSON:
 		{
 		  "data": {
-		    "Dest": "<NUMBER/SIP_URI>", // Mandatory 
+		    "Dest": "<NUMBER/SIP_URI>", // Mandatory
 		    "Line": "<LINE_NUMBER>", // Mandatory, default is Line 1
-		    "Type": "<SIP/TEL/H323>" // Optional, default is TEL 
+		    "Type": "<SIP/TEL/H323>" // Optional, default is TEL
 		  }
 		}
-		
+
 		Success Response:
 		{
 		  "Status": 2000
 		}
-		
+
 		Failure Response:
 		{
 			"Status": <4xxx/5xxx>
 		}
-		
-		Applicable return codes 2000, 4000, 4002, 5000, 4002 
+
+		Applicable return codes 2000, 4000, 4002, 5000, 4002
 		*/
 
 		String dialString = device.getDialString().trim();
@@ -498,15 +448,6 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 */
 	@Override
 	public List<Statistics> getMultipleStatistics() throws Exception {
-		ExtendedStatistics extendedStatistics = new ExtendedStatistics();
-		Map<String, String> extendedStatisticsMap = new HashMap<>();
-		List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
-		extendedStatistics.setControllableProperties(advancedControllableProperties);
-		extendedStatistics.setStatistics(extendedStatisticsMap);
-
-		populateStatistics(extendedStatisticsMap);
-		populateControllableProperties(extendedStatisticsMap, advancedControllableProperties);
-
 		// get registration status (from line info)
 		// all API calls must be synchronized (see comments to apiLock)
 		ListMessage listResponse;
@@ -518,128 +459,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		}
 		checkResponseStatus(listResponse.getStatus(), LINE_INFO_URI);
 
-		return Arrays.asList(parseEndpointStats(listResponse.getData()), extendedStatistics);
-	}
-
-	/**
-	 * Add controllable properties, that are not covered by the YML mapping
-	 * @param statistics to add statistics properties to
-	 */
-	private void populateStatistics(Map<String, String> statistics) throws Exception {
-		devicePropertyProcessor.applyProperties(statistics, retrieveDeviceInfo(), "DeviceInfo");
-		devicePropertyProcessor.applyProperties(statistics, retrieveNetworkStats(), "NetworkInfo");
-		devicePropertyProcessor.applyProperties(statistics, retrieveRunningConfig(), "RunningConfig");
-		devicePropertyProcessor.applyProperties(statistics, retrieveStatus(), "DeviceStatus");
-		devicePropertyProcessor.applyProperties(statistics, retrieveTransferType(), "TransferType");
-
-		statistics.put("DeviceInfo#Uptime", normalizeDeviceUptime(statistics.get("DeviceInfo#Uptime")));
-		statistics.put("NetworkInfo#Uptime", normalizeDeviceUptime(statistics.get("NetworkInfo#Uptime")));
-	}
-
-	/**
-	 * Add controllable properties, that are not covered by the YML mapping
-	 * @param statistics to add controls statistics properties to
-	 * @param controls to add advanced controllable properties to
-	 */
-	private void populateControllableProperties(Map<String, String> statistics, List<AdvancedControllableProperty> controls) {
-		statistics.put("RestartDevice", "");
-		controls.add(createButton("RestartDevice", "Restart", "Restarting...", 30000L));
-
-		statistics.put("RebootDevice", "");
-		controls.add(createButton("RebootDevice", "Reboot", "Rebooting...", 30000L));
-	}
-
-	/**
-	 * Request basic device info
-	 * @return {@link JsonNode} containing the response payload
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private JsonNode retrieveDeviceInfo () throws Exception {
-		return doGet(DEVICE_INFO_URI, JsonNode.class);
-	}
-
-	/**
-	 * Request network stats of the device
-	 * @return {@link JsonNode} containing the response payload
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private JsonNode retrieveNetworkStats() throws Exception {
-		return doGet(NETWORK_STATS_URI, JsonNode.class);
-	}
-
-	/**
-	 * Request running config state of the device
-	 * @return {@link JsonNode} containing the response payload
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private JsonNode retrieveRunningConfig() throws Exception {
-		return doGet(RUNNING_CONFIG_URI, JsonNode.class);
-	}
-
-	/**
-	 * Request transfer type status of the device
-	 * @return {@link JsonNode} containing the response payload
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private JsonNode retrieveStatus() throws Exception {
-		return doGet(STATUS_URI, JsonNode.class);
-	}
-
-	/**
-	 * Request transfer type status of the device
-	 * @return {@link JsonNode} containing the response payload
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private JsonNode retrieveTransferType() throws Exception {
-		return doGet(TRANSFER_TYPE_URI, JsonNode.class);
-	}
-
-	/**
-	 * Request to reboot the device
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private void restartDevice() throws Exception {
-		doPost(RESTART_URI, null);
-	}
-
-	/**
-	 * Request to reboot the device
-	 *
-	 * @throws Exception if any communication error occurs
-	 */
-	private void rebootDevice() throws Exception {
-		doPost(REBOOT_URI, null);
-	}
-
-	/**
-	 * Normalize uptime format from
-	 * 0 day 0:34:33
-	 * to
-	 * 0 day(s) 0 hour(s) 34 minute(s) 33 second(s)
-	 *
-	 * @param rawUptime in a format of '0 day 0:34:33'
-	 * @return normalized uptime in a format 0 day(s) 0 hour(s) 34 minute(s) 33 second(s)
-	 */
-	private String normalizeDeviceUptime (String rawUptime) {
-		StringBuilder uptime = new StringBuilder();
-		Pattern pattern = Pattern.compile("(\\d+)\\sday\\s(\\d+):(\\d+):(\\d+)", Pattern.CASE_INSENSITIVE);
-		Matcher matcher = pattern.matcher(rawUptime);
-		if (matcher.find()) {
-			uptime.append(matcher.group(1)).append(" day(s) ").append(matcher.group(2)).append(" hour(s) ")
-					.append(matcher.group(3)).append(" minute(s) ").append(matcher.group(4)).append(" second(s)");
-		} else {
-			if (logger.isDebugEnabled()) {
-				logger.debug("No valid date format found in a raw uptime string: " + rawUptime);
-			}
-			return rawUptime;
-		}
-		return uptime.toString();
+		return singletonList(parseEndpointStats(listResponse.getData()));
 	}
 
 	/**
@@ -649,27 +469,27 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	public void hangup(String callId) throws Exception {
 		/*
 		 Description:
-		 This API ends an active call. 
-		 
+		 This API ends an active call.
+
 		 Method: POST
-		 Path: /api/v1/callctrl/endCall 
+		 Path: /api/v1/callctrl/endCall
 		 Input JSON:
 		 {
 		   "data": {
 		     "Ref": "<CALL_REFERENCE>" // Mandatory
 		   }
 		 }
-		 
+
 		Success Response:
 		{
 		  "Status": 2000
 		}
-		 
+
 		Failure Response:
 		{
 			"Status": <4xxx/5xxx>
 		}
-		
+
 		Applicable return codes 2000, 4000, 4003, 4007, 5000
 		*/
 
@@ -710,26 +530,26 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		/*
 		 Description:
 		 This API enables a user to mute the phone
-		 
+
 		 Method: POST
-		 Path: /api/v1/callctrl/mute 
+		 Path: /api/v1/callctrl/mute
 		 Input JSON:
 		 {
 		   "data": {
 		     "state": "1" // Mandatory
 		   }
 		 }
-		
+
 		 Success Response:
 		 {
 		   "Status": 2000
 		 }
-		
+
 		 Failure Response:
 		 {
 		 	"Status": <4xxx/5xxx>
 		 }
-		 
+
 		 Applicable return codes 2000, 4000, 4003, 4007, 5000
 		 */
 
@@ -770,12 +590,12 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		  },
 		  "Status": "2000"
 		}
-				
+
 		Failure Response:
 		{
 			“Status": <4xxx/5xxx>
 		}
-		
+
 		Applicable return codes: 2000, 4007, 5000
 		*/
 
@@ -817,7 +637,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		/*
 		 Description:
 		 This API retrieves mute status by extracting value of PhoneMuteState from response
-		  
+
 		 Method: GET
 		 Path: /api/v1/mgmt/media/communicationInfo
 		 Success Response:
@@ -833,12 +653,12 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		   },
 		   "Status": "2000"
 		 }
-		 		
+
 		 Failure Response:
 		 {
 		 	“Status": <4xxx/5xxx>
 		 }
-		
+
 		 Applicable return codes: 2000, 4007, 5000
 		*/
 
@@ -868,7 +688,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	/**
 	 * {@inheritDoc}<br>
 	 * for PolycomTrio implementation we make a call to retreive the firmware version on the device.
-	 * 
+	 *
 	 * @since 4.7
 	 */
 	@Override
@@ -891,12 +711,12 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 			},
 			"Status": "2000"
 		}
-				
+
 		Failure Response:
 		{
 			“Status": <4xxx/5xxx>
 		}
-		
+
 		Applicable return codes: 2000, 4007, 5000
 		*/
 
@@ -932,26 +752,26 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		/*
 		 Description:
 		 This API enables a user to unmute the phone
-		 
+
 		 Method: POST
-		 Path: /api/v1/callctrl/mute 
+		 Path: /api/v1/callctrl/mute
 		 Input JSON:
 		 {
 		   "data": {
 		     "state": "0" // Mandatory
 		   }
 		 }
-		
+
 		 Success Response:
 		 {
 		   "Status": 2000
 		 }
-		
+
 		 Failure Response:
 		 {
 		 	"Status": <4xxx/5xxx>
 		 }
-		 
+
 		 Applicable return codes 2000, 4000, 4003, 4007, 5000
 		 */
 
@@ -1013,7 +833,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 * Retrieves requested video bit rate from video stream. <br>
 	 * There is a bug in Polycom Trio 5.8 API which reports crazy value for requested video rate. To fix it, return {@code null} for {@code PolycomTrio} and
 	 * allow to override it for {@code PolycomVVX} with actual value from video stream.
-	 * 
+	 *
 	 * @param stream video stream data
 	 * @return requested video bit rate for {@code PolycomVVX}, or {@code null} for {@code PolycomTrio}
 	 */
@@ -1088,7 +908,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 
 	/**
 	 * After we make API call to get call status from device we parse the results here.
-	 * 
+	 *
 	 * @param data map of strings (keys) to object values and is the response data to parse
 	 * @return call status gathered or {@code null} if not in a call
 	 * @since 4.7
@@ -1126,6 +946,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	/**
 	 * Response from device for statistics is returned as a map (data param). We parse it here
 	 *
+	 * @param data usually the response from the Trio including lots of statistics
 	 * @return all required statistics wraped in EndpointStatistics object
 	 * @throws Exception if any errors
 	 * @since 4.7
@@ -1185,7 +1006,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 
 	/**
 	 * Takes the response from the device for call stats and puts them into the endpointStatistics param
-	 * 
+	 *
 	 * @param endpointStatistics stats to be populated from the in call data response
 	 * @param mediaSessions in call data response
 	 * @throws Exception if any errors
@@ -1290,7 +1111,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	/**
 	 * Response from device for version is returned as a map (data param). We query it for the specific firmware relase key and set value of that entry to the
 	 * version return object
-	 * 
+	 *
 	 * @param data usually the response from the Trio including the firmware version
 	 * @return version object with the version field populated, or null if the version could not be gathered
 	 * @since 4.7
@@ -1306,24 +1127,6 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 			}
 		}
 		return null;
-	}
-
-	/**
-	 * Instantiate Text controllable property
-	 *
-	 * @param name         name of the property
-	 * @param label        default button label
-	 * @param labelPressed button label when is pressed
-	 * @param gracePeriod  period to pause monitoring statistics for
-	 * @return instance of AdvancedControllableProperty with AdvancedControllableProperty.Button as type
-	 */
-	private AdvancedControllableProperty createButton(String name, String label, String labelPressed, long gracePeriod) {
-		AdvancedControllableProperty.Button button = new AdvancedControllableProperty.Button();
-		button.setLabel(label);
-		button.setLabelPressed(labelPressed);
-		button.setGracePeriod(gracePeriod);
-
-		return new AdvancedControllableProperty(name, new Date(), button, "");
 	}
 
 	/**
@@ -1600,7 +1403,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 * populate {@link CallStats} object and populate its {@code callId}, {@code remoteAddress}, and {@code protocol} properties.<br>
 	 * <br>
 	 * if device returns "4007 Call Does Not Exist" response, or a "CallState" other than "Connected" or "OnHold", this method will return {@code null}
-	 * 
+	 *
 	 * @return instance of {@link CallStats} object with only the {@code callId} and {@code remoteAddress} properties, or {@code null} if device not in call
 	 * @throws Exception if any error occurs
 	 */
@@ -1653,7 +1456,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	/**
 	 * Retrieves one or more config properties from the device. <br>
 	 * Note that for config properties exposed in Polycom Trio UI, property names are available in the "Field Help" section.
-	 * 
+	 *
 	 * @param propertyNames list of property names to retrieve config data for
 	 * @return map of config properties where key is config property name and values is config property value wrapper
 	 * @throws Exception if any error occurs
@@ -1712,7 +1515,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 * populate {@link CallStats} object and populate its {@code callId}, {@code remoteAddress}, and {@code protocol} properties.<br>
 	 * <br>
 	 * if device returns "4007 Call Does Not Exist" response, or a "CallState" other than "Connected" or "OnHold", this method will return {@code null}
-	 * 
+	 *
 	 * @return instance of {@link CallStats} object with only the {@code callId} and {@code remoteAddress} properties, or {@code null} if device not in call
 	 * @throws Exception if any error occurs
 	 */
