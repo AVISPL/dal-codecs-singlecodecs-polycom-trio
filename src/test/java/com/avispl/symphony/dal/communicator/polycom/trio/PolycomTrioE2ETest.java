@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2018-2022 AVI-SPL Inc. All Rights Reserved.
+ */
 package com.avispl.symphony.dal.communicator.polycom.trio;
 
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
@@ -6,7 +9,6 @@ import com.avispl.symphony.api.dal.dto.monitor.Statistics;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.BeforeEach;
 
 import java.util.List;
 

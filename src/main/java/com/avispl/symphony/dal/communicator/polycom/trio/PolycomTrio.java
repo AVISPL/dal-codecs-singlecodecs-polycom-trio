@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 AVI-SPL Inc. All Rights Reserved.
+ * Copyright (c) 2018-2022 AVI-SPL Inc. All Rights Reserved.
  */
 package com.avispl.symphony.dal.communicator.polycom.trio;
 
