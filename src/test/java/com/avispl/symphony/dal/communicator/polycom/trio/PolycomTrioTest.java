@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 AVI-SPL Inc. All Rights Reserved.
+ * Copyright (c) 2018-2022 AVI-SPL Inc. All Rights Reserved.
  */
 package com.avispl.symphony.dal.communicator.polycom.trio;
 
@@ -12,12 +12,10 @@ import com.avispl.symphony.api.dal.dto.control.call.DialDevice;
 import com.avispl.symphony.api.dal.dto.control.call.MuteStatus;
 import com.avispl.symphony.api.dal.dto.control.call.PopupMessage;
 import com.avispl.symphony.api.dal.dto.monitor.*;
-import com.avispl.symphony.dal.util.JsonUtils;
 import com.avispl.symphony.dal.util.StringUtils;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.Module;
 import org.junit.AfterClass;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
