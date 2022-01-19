@@ -631,8 +631,14 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		Pattern pattern = Pattern.compile("(\\d+)\\sday(s?)\\s(\\d+):(\\d+):(\\d+)", Pattern.CASE_INSENSITIVE);
 		Matcher matcher = pattern.matcher(rawUptime);
 		if (matcher.find()) {
-			uptime.append(matcher.group(1)).append(" day(s) ").append(matcher.group(2)).append(" hour(s) ")
-					.append(matcher.group(3)).append(" minute(s) ").append(matcher.group(4)).append(" second(s)");
+			String days = matcher.group(1);
+			String hours = matcher.group(2);
+			String minutes = matcher.group(3);
+			String seconds = matcher.group(4);
+			uptime.append(StringUtils.isNotNullOrEmpty(days) ? "0" : days).append(" day(s) ")
+					.append(StringUtils.isNotNullOrEmpty(hours) ? "0" : hours).append(" hour(s) ")
+					.append(StringUtils.isNotNullOrEmpty(minutes) ? "0" : minutes).append(" minute(s) ")
+					.append(StringUtils.isNotNullOrEmpty(seconds) ? "0" : seconds).append(" second(s)");
 		} else {
 			if (logger.isDebugEnabled()) {
 				logger.debug("No valid date format found in a raw uptime string: " + rawUptime);
