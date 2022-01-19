@@ -628,7 +628,7 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 */
 	private String normalizeDeviceUptime (String rawUptime) {
 		StringBuilder uptime = new StringBuilder();
-		Pattern pattern = Pattern.compile("(\\d+)\\sday\\s(\\d+):(\\d+):(\\d+)", Pattern.CASE_INSENSITIVE);
+		Pattern pattern = Pattern.compile("(\\d+)\\sday(s?)\\s(\\d+):(\\d+):(\\d+)", Pattern.CASE_INSENSITIVE);
 		Matcher matcher = pattern.matcher(rawUptime);
 		if (matcher.find()) {
 			uptime.append(matcher.group(1)).append(" day(s) ").append(matcher.group(2)).append(" hour(s) ")
