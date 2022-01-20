@@ -628,11 +628,13 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 	 */
 	private String normalizeDeviceUptime (String rawUptime) {
 		StringBuilder uptime = new StringBuilder();
-		Pattern pattern = Pattern.compile("(\\d+)\\sday\\s(\\d+):(\\d+):(\\d+)", Pattern.CASE_INSENSITIVE);
+		Pattern pattern = Pattern.compile("(\\d+)\\sday[s]?\\s(\\d+):(\\d+):(\\d+)", Pattern.CASE_INSENSITIVE);
 		Matcher matcher = pattern.matcher(rawUptime);
 		if (matcher.find()) {
-			uptime.append(matcher.group(1)).append(" day(s) ").append(matcher.group(2)).append(" hour(s) ")
-					.append(matcher.group(3)).append(" minute(s) ").append(matcher.group(4)).append(" second(s)");
+			uptime.append(matcher.group(1)).append(" day(s) ")
+					.append(matcher.group(2)).append(" hour(s) ")
+					.append(matcher.group(3)).append(" minute(s) ")
+					.append(matcher.group(4)).append(" second(s)");
 		} else {
 			if (logger.isDebugEnabled()) {
 				logger.debug("No valid date format found in a raw uptime string: " + rawUptime);
