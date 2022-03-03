@@ -532,8 +532,14 @@ public class PolycomTrio extends RestCommunicator implements CallController, Mon
 		devicePropertyProcessor.applyProperties(statistics, retrieveStatus(), "DeviceStatus");
 		devicePropertyProcessor.applyProperties(statistics, retrieveTransferType(), "TransferType");
 
-		statistics.put("DeviceInfo#Uptime", normalizeDeviceUptime(statistics.get("DeviceInfo#Uptime")));
-		statistics.put("NetworkInfo#Uptime", normalizeDeviceUptime(statistics.get("NetworkInfo#Uptime")));
+		String deviceUptime = statistics.get("DeviceInfo#Uptime");
+		if (StringUtils.isNotNullOrEmpty(deviceUptime)) {
+			statistics.put("DeviceInfo#Uptime", normalizeDeviceUptime(deviceUptime));
+		}
+		String networkUptime = statistics.get("NetworkInfo#Uptime");
+		if (StringUtils.isNotNullOrEmpty(networkUptime)) {
+			statistics.put("NetworkInfo#Uptime", normalizeDeviceUptime(networkUptime));
+		}
 	}
 
 	/**
